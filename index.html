@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <title>最終課題</title>
+        <script type="text/javascript">
+            'use strict'
+            let ctx;
+            const width = 700; // キャンバス幅
+            const height = 400; // キャンバス高さ
+            let loopInterval; // ゲームループ
+            let titleImage;
+            let locX, locY, characterImage;
+            let characterDirection = "right"; //キャラの向き
+            let speed;
+            let jump = 0;
+            let gravity = 0;
+            let enemylocX, enemylocY, enemyImage, enemySpeed;
+            let enemyjump = 0, enemygravity = 1.5, enemydirection;
+            let score;
+            let characterR, enemyR, itemR; // 当たり判定用の半径
+            let frameCount;
+            let moveleft = false; // 移動用条件
+            let moveright = false;
+            let GameStart = false; // ゲーム開始のフラグ
+            let GameOver = false; // ゲームオーバーのフラグ
+            let GameClear = false;
+            let life, enemylife; // 残機の設定
+            let heartImage; // 残機表示
+            let blink = false; // 点滅状態
+            let blinkInterval;
+            let alpha = 1; // キャラの透明度
+            let extraActive = false; // エキストラステージのフラグ
+            let itemlocX, itemlocY, itemImage, attack = false;
+            let groundImage, backgroundImage;
+
+            const ImgArray = {Run1: "Robot01.png", 
+            Run2: "Robot02.png", Run3: "Robot03.png", Ground: "ground.png", Enemy1: "box.png", Enemy2: "box_enemy2.png",
+            Background: "background.png", Item: "battery.png", Title: "title.png"};
+
+            window.onload = function() {
+                const canvas = document.getElementById("main");
+                ctx = canvas.getContext("2d");
+
+                // キャンバスサイズの指定
+                canvas.width = width;
+                canvas.height = height;
+
+                // キーイベント
+                document.addEventListener('keydown', keydown);
+                document.addEventListener('keyup', keyup);
+
+                // ゲーム開始画面
+                start();
+            };
+
+            function start() {
+                ctx.fillStyle = "grey";
+                ctx.fillRect(0, 0, width, height);
+
+                groundImage = new Image();
+                groundImage.src = ImgArray.Ground;
+
+                backgroundImage = new Image();
+                backgroundImage.src = ImgArray.Background;
+
+                titleImage = new Image();
+                titleImage.src = ImgArray.Title;
+                titleImage.onload = function() {
+                    ctx.drawImage(titleImage, (width - titleImage.width / 5) / 2, (height - titleImage.height / 5) / 2, titleImage.width / 5, titleImage.height / 5);
+                };
+                
+                ctx.fillStyle = "white";
+                ctx.font = "16pt serif";
+                const startLabel = "Press [Space] to Start";
+                const startWidth = ctx.measureText(startLabel).width;
+                ctx.fillText(startLabel, (width - startWidth) / 2, height / 2 + 70);
+            }
+
+            // ゲームの初期化
+            function init() {
+                // キャラ設定
+                locX = 50;
+                locY = 300;
+                characterR = 30;
+                characterImage = new Image();
+                characterImage.src = ImgArray.Run1;
+                speed = 6;
+
+                // 敵キャラ設定
+                enemylocX = 650;
+                enemylocY = 300;
+                enemyR = 20;
+                enemyImage = new Image();
+                enemyImage.src = ImgArray.Enemy1;
+                enemySpeed = 5;
+
+                enemydirection = 7;
+
+                // 残機表示
+                heartImage = new Image();
+                heartImage.src = "heart.png";
+
+                itemImage = new Image();
+                itemImage.src = ImgArray.Item;
+                itemR = 30;
+                itemlocX = null; // アイテム位置をリセット
+                itemlocY = null;
+
+                // 初期スコア
+                score = 0;
+                life = 3;
+                enemylife = 2;
+                attack = false;
+                GameOver = false;
+                GameStart = true;
+                extraActive = false;
+
+                //ループの重複を防止
+                clearInterval(loopInterval);
+                loopInterval = setInterval(loop, 1000 / 60);
+            }
+
+            // キーダウンイベント
+            function keydown(evt) {
+                const key = evt.keyCode;
+
+                if (key === 32) { // スペースキーでジャンプまたはゲーム開始
+                    if (!GameStart) {
+                        init();
+                    } else if (locY === 300) {
+                        jump = -20;
+                        gravity = 1.5;
+                    }
+                }
+
+                if (key === 39){
+                    moveright = true;
+                    characterDirection = "right";
+                }
+                if (key === 37){
+                    moveleft = true;
+                    characterDirection = "left";
+                }
+                if(key === 27) score = 1000;
+            }
+
+            // キーアップイベント
+            function keyup(evt) {
+                const key = evt.keyCode;
+
+                if (key === 39) moveright = false;
+                if (key === 37) moveleft = false;
+            }
+
+            function loop() {
+                if (GameStart && !GameOver) {
+                    update();
+                    draw();
+                }
+            }
+
+            // ゲームの更新
+            function update() {
+                frameCount++;
+                jump += gravity;
+                locY += jump;
+
+                // キャラX移動
+                if (moveright && locX <= width - 50) locX += speed;
+                if (moveleft && locX >= 0) locX -= speed;
+
+                //キャラY移動
+                if (locY > 300) {
+                    locY = 300;
+                    jump = 0;
+                    gravity = 0;
+                }
+
+                //走りモーション
+                if (locY === 300) {
+                    if (frameCount <= 5) {
+                        characterImage.src = ImgArray.Run1;
+                    } else if (frameCount > 5 && frameCount <= 10) {
+                        characterImage.src = ImgArray.Run3;
+                    }else if (frameCount > 15 && frameCount <= 20) {
+                        characterImage.src = ImgArray.Run2;
+                    }else if (frameCount > 20 && frameCount <= 25) {
+                        characterImage.src = ImgArray.Run3;
+                    }else {
+                        frameCount = 0;
+                    }
+                }else{
+                    characterImage.src = ImgArray.Run3;
+                }
+
+                // 敵キャラの出現・移動
+                enemylocX -= enemySpeed;
+                if (enemylocX < -100) {
+                    enemylocX = width + Math.random() * 200;
+                    enemySpeed = 6 + Math.floor(score / 100) * 1.2;
+                    score += 100;
+                }
+
+                //EXステージ
+                if (score >= 1000 && !extraActive) {
+                    enemySpeed = 0;
+                    extraActive = true;
+                    enemyImage.src = ImgArray.Enemy2;
+                    enemylocX = width - 50;
+
+                    //アイテムの出現
+                    itemlocX = width - 100;
+                    itemlocY = 200;
+                }
+
+                if (extraActive) {
+                    updateExtra();
+                }
+
+                checkCollision();
+            }
+
+            // EX敵の設定
+            function updateExtra() {
+                enemyR = 26; //EX敵の半径
+
+                if (enemylocY >= 300 && Math.random() < 0.05) {
+                    enemyjump = -18;
+                }
+
+                enemyjump += enemygravity;
+                enemylocY += enemyjump;
+
+                if (enemylocY >= 300) {
+                    enemylocY = 300;
+                    enemyjump = 0;
+                }
+
+                enemylocX -= enemydirection;
+                if (enemylocX < 0 || enemylocX > width - 50) {
+                    enemydirection *= -1;
+                    enemylocX -= enemydirection;
+                }
+            }
+
+            // 当たり判定
+            function checkCollision() {
+                const hitX = locX - enemylocX;
+                const hitY = locY - enemylocY;
+                const distance1 = Math.sqrt(hitX * hitX + hitY * hitY); //三平方
+
+                if (distance1 < characterR + enemyR && !blink) {
+                    if(attack){
+                        attack = false;
+                        enemylife -= 1;
+
+                        if(enemylife <= 0){
+                            enemySpeed = 0;
+                            enemyImage.src = "";
+                            GameClear = true;
+                        }
+                        else{
+                            enemydirection *= 1.5;
+                            enemylocX = 10;
+                            if (enemylife === 1) {
+                            itemImage.src = ImgArray.Item;
+                            itemlocX = 100;
+                        }
+                        }
+
+                    //被ダメージ
+                    }else if(!attack){
+                        life--;
+
+                        if (life <= 0) {
+                            enemySpeed = 0;
+                            characterImage.src = "";
+                            GameOver = true;
+                        } else  {
+                            blinkCharacter();
+                        }
+                    }
+                }
+
+                const getX = locX - itemlocX;
+                const getY = locY - itemlocY;
+                const distance2 = Math.sqrt(getX * getX + getY * getY);
+                if (distance2 < characterR + itemR) {
+                    itemImage.src = "";
+                    attack = true;
+                }
+
+            }
+
+            // 点滅処理
+            function blinkCharacter() {
+                blink = true;
+                let blinkCount = 0;
+                alpha = 1;
+
+                blinkInterval = setInterval(() => {
+                    alpha = (alpha === 1) ? 0 : 1;
+                    blinkCount++;
+                    if (blinkCount >= 8) {
+                        clearInterval(blinkInterval);
+                        blink = false;
+                        alpha = 1;
+                        if (score < 500) {
+                            enemylocX = -100;
+                            score -= 100;
+                        }
+
+                        locX = 50;
+                        locY = 300;
+                        
+                    }
+                }, 100);
+            }
+
+            // 描画処理
+            function draw() {
+                ctx.clearRect(0, 0, width, height);
+
+                ctx.fillStyle = "#BEBEBE";
+                ctx.fillRect(0, 0, width, height);
+
+                if(backgroundImage.complete){
+                    for(let x = 0; x < width; x += backgroundImage.width / 3){
+                    ctx.drawImage(backgroundImage, x, 0, backgroundImage.width / 3, backgroundImage.height / 3);
+                    }
+                }
+                
+
+                //地面の描画
+                if(groundImage.complete){
+                    for(let x = 0; x < width; x += groundImage.width / 5){
+                    ctx.drawImage(groundImage, x, 310, groundImage.width / 5, groundImage.height / 5);
+                    }
+                }
+
+                ctx.globalAlpha = alpha;
+                ctx.save();
+
+                if (attack) {
+                    ctx.filter = "sepia(100%)"; //attack時に色をオレンジに変更
+                }
+
+                if (characterDirection === "left") {
+                    ctx.translate(locX + 25, locY); // キャラの中心を移動
+                    ctx.scale(-1, 1); // 左右反転
+                    ctx.drawImage(characterImage, -25, -55, 80, 80); // 中心を基準に描画
+                } else {
+                    ctx.translate(locX, locY); // 通常の位置
+                    ctx.drawImage(characterImage, -25, -55, 80, 80); 
+                }
+                ctx.restore();
+                ctx.globalAlpha = 1;
+
+
+
+                if(!extraActive){
+                    ctx.drawImage(enemyImage, enemylocX - 25, enemylocY - 23, 60, 60);
+                }else if(extraActive){
+                    ctx.save();
+                    ctx.translate(enemylocX, enemylocY);
+
+                    if(enemydirection < 0){
+                        ctx.scale(-1, 1);
+                    }
+                    ctx.drawImage(enemyImage, - 40, - 45, 90, 90);
+                    ctx.restore();
+                }
+
+                if(extraActive && itemImage){
+                    ctx.drawImage(itemImage, itemlocX, itemlocY - 40, 80, 80);
+                }
+
+
+                for (let i = 0; i < life; i++) {
+                    ctx.drawImage(heartImage, 10 + i * 30, 10, 27, 27);
+                }
+
+                ctx.fillStyle = "#646464";
+                ctx.fillRect(480, 0, 160, 20);
+                ctx.fillStyle = "white";
+                ctx.font = "bold 16pt serif";
+                ctx.fillText("SCORE: " + score, 500, 20);
+
+
+                if (GameOver) {
+                    ctx.fillStyle = "white";
+                    ctx.font = "bold 30pt serif";
+                    const overLabel = "GAME OVER";
+                    const overWidth = ctx.measureText(overLabel).width;
+                    ctx.fillText(overLabel, (width - overWidth) / 2, height / 2);
+
+                    ctx.font = "bold 12pt serif";
+                    const restartLabel = "Press [Space] to Restart";
+                    const restartWidth = ctx.measureText(restartLabel).width;
+                    ctx.fillText(restartLabel, (width - restartWidth) / 2, height / 2 + 40);
+                    GameStart = false;
+                }
+
+                if (GameClear) {
+                    ctx.fillStyle = "white";
+                    ctx.font = "bold 30pt serif";
+                    const clearLabel = "GAME CLEAR!!";
+                    const clearWidth = ctx.measureText(clearLabel).width;
+                    ctx.fillText(clearLabel, (width - clearWidth) / 2, height / 2);
+
+                    GameStart = false;
+                }
+            }
+        </script>
+    </head>
+
+    <body>
+        <canvas id="main"></canvas>
+    </body>
+</html>
